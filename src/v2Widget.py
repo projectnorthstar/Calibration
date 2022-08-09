@@ -1,14 +1,8 @@
-import os
 import numpy as np
 import cv2
-import math
-import time
 import abc
 import typing
-from wand.image import Image
 import sys
-
-
 
 from PySide6.QtWidgets import QApplication, QWidget, QSizePolicy
 from PySide6.QtCore import QTimer, Qt, QRect
@@ -19,13 +13,6 @@ from forms.v2Form import Ui_V2Form
 from utils.polyHelpers import calcCoeffs
 from utils.cameras import T265Camera
 from utils.lut import LookupTable
-
-def wait(timeInMs):
-    timeInNs = timeInMs * 1000000
-    t = time.time_ns()
-    while(time.time_ns() - t < timeInNs):
-        cv2.waitKey(10)
-    return
 
 def cachedArray(func):
     def inner(self, height, width, *args, **kwargs):

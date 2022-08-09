@@ -1,9 +1,7 @@
 from utils.polyHelpers import polyfit2d
-import cv2
 import json
 import numpy as np
 import sys
-from scipy.spatial.transform import Rotation as R
 
 class ARRaytracer:
     
@@ -197,6 +195,7 @@ class LookupTable:
         return
         
 if __name__=="__main__":
+    import cv2
     lut = LookupTable()
     lut.loadCameraProperties(r"data\CameraProperties.json")
     lut.loadV2Calibration(r"data\V2Out.json")

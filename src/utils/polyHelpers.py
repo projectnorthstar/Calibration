@@ -1,11 +1,5 @@
-import os
 import numpy as np
 import cv2
-import math
-import time
-import traceback
-import sys
-import json
 
 def polyfit2d(X, Y, Z, deg):
   """Fit a 3D polynomial of degree deg"""
