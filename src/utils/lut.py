@@ -100,8 +100,8 @@ class ARRaytracer:
     def fit(self, optics, polynomialDegree=3):
         displayUVs = []
         cameraRays = []
-        for rx in np.linspace(-1, 1, num=400):
-            for ry in np.linspace(-1, 1, num=400):
+        for rx in np.linspace(-1, 1, num=32):
+            for ry in np.linspace(-1, 1, num=32):
                 ray = np.array([rx, ry, 1.0])
                 uv = self.renderUVToDisplayUV(ray, optics)
                 uv = 1 - uv
