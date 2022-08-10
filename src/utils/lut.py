@@ -1,4 +1,5 @@
 from utils.polyHelpers import polyfit2d
+from utils.transformHelpers import worldToViewport
 import json
 import numpy as np
 import sys
@@ -132,17 +133,6 @@ class LookupTable:
         self.cameraProperties = None
         return
         
-    def viewToUV(self, x, y, z=-1.0):
-        rx = self.cameraProperties["projectionMatrix"][0] * x + self.cameraProperties["projectionMatrix"][1] * y + self.cameraProperties["projectionMatrix"][2] * z + self.cameraProperties["projectionMatrix"][3]
-        ry = self.cameraProperties["projectionMatrix"][4] * x + self.cameraProperties["projectionMatrix"][5] * y + self.cameraProperties["projectionMatrix"][6] * z + self.cameraProperties["projectionMatrix"][7]
-        rz = self.cameraProperties["projectionMatrix"][8] * x + self.cameraProperties["projectionMatrix"][9] * y + self.cameraProperties["projectionMatrix"][10] * z + self.cameraProperties["projectionMatrix"][11]
-        w = self.cameraProperties["projectionMatrix"][12] * x + self.cameraProperties["projectionMatrix"][13] * y + self.cameraProperties["projectionMatrix"][14] * z + self.cameraProperties["projectionMatrix"][15]
-        rx /= w
-        ry /= w
-        rx = (rx * 0.5 + 0.5)
-        ry = (ry * 0.5 + 0.5)
-        return np.array([rx, ry])
-        
     def loadCameraProperties(self, path):
         data = None
         with open(path, "r") as f:
@@ -160,22 +150,20 @@ class LookupTable:
         _, height, width, _ = self.lut.shape
         xData = (np.array(data["left_uv_to_rect_x"]), np.array(data["right_uv_to_rect_x"]))
         yData = (np.array(data["left_uv_to_rect_y"]), np.array(data["right_uv_to_rect_y"]))
-        pm = np.array(self.cameraProperties["projectionMatrix"]).reshape((4,4)).T
+        pm = np.array(self.cameraProperties["projectionMatrix"]).reshape((4,4))
         v, u = np.indices((height, width))
         u = u.ravel() / (width - 1)
         v = 1.0 - v.ravel() / (height - 1)
         for i in range(2):
-            points = np.ones((u.shape[0], 4))
+            points = np.ones((u.shape[0], 3))
             points[:, 0] = np.polynomial.polynomial.polyval2d(u, v, xData[i].reshape((4,4)))
+            #flip y to convert it from opencv to unity coordinate space, flip z bcs camera's forward is the negative Z axis, see: https://docs.unity3d.com/ScriptReference/Camera-worldToCameraMatrix.html
             points[:, 1] = -np.polynomial.polynomial.polyval2d(u, v, yData[i].reshape((4,4)))
             points[:, 2] *= -1
-            rg = points @ pm
-            rg[:,0] /= rg[:, 3]
-            rg[:,1] /= rg[:, 3]
-            rg = (rg * 0.5 + 0.5) * 65535
-            rg = rg.reshape((height, width, 4))
+            rg = worldToViewport(pm, points) * 65535
+            rg = rg.reshape((height, width, 2))
             self.lut[i, :, :, 2] = rg[:, :, 0]
-            self.lut[i, :, :, 1] = rg[:, :, 1] 
+            self.lut[i, :, :, 1] = rg[:, :, 1]
         return
         
     def loadV1Calibration(self, path):

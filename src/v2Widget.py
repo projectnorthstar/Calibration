@@ -13,6 +13,7 @@ from forms.v2Form import Ui_V2Form
 from utils.polyHelpers import calcCoeffs
 from utils.cameras import T265Camera
 from utils.lut import LookupTable
+from utils.transformHelpers import viewportToWorld, worldToPixel
 
 def cachedArray(func):
     def inner(self, height, width, *args, **kwargs):
@@ -250,7 +251,7 @@ class QPatternScreen(QImageArea, Screen):
         self.widget = QWidget()
         self.widget.setWindowState(Qt.WindowFullScreen)
         layout = QVBoxLayout()
-        self.label.setPixmap(QPixmap(u"blank.png"))
+        self.label.setPixmap(QPixmap(r"imgs\blank.png"))
         sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.label.setSizePolicy(sizePolicy)
         self.label.setScaledContents(True)
@@ -403,6 +404,7 @@ class CalibrationWidget(QWidget):
         return
         
     def onPolyFitPressed(self):
+        #TODO
         cal = self.calibrationManager.calibrateGreycodes(self.selectedCamera, self.calibrationManager.widthBits, self.calibrationManager.heightBits)
         lut = LookupTable()
         lut.loadCameraProperties(r"data\CameraProperties.json")
@@ -410,16 +412,17 @@ class CalibrationWidget(QWidget):
         
         targetResolution = (1440, 1600)
         targetWidth, targetHeight = targetResolution
-        pixelRect = lut.cameraProperties["pixelRect"]
+        pm = np.array(lut.cameraProperties["projectionMatrix"]).reshape((4,4))
+        pixelRect = worldToPixel(viewportToWorld(pm, np.array(((0,0),(0,1),(1,1),(1,0))), -1), flipY=True)
         import cv2
-        img = cv2.imread("imgs\charuco.png", cv2.IMREAD_GRAYSCALE)
+        img = cv2.imread(r"imgs\charuco.png", cv2.IMREAD_GRAYSCALE)
         #remap from checker to region captured by left / right camera
         ry, rx = np.indices(targetResolution[::-1]).astype(np.float32)
-        scaleX = abs(pixelRect["r11"][0] - pixelRect["r01"][0]) / targetWidth
-        scaleY = abs(pixelRect["r00"][1] - pixelRect["r01"][1]) / targetHeight
-        rx = rx * scaleX + pixelRect["r01"][0]
-        ry = ry * scaleY + pixelRect["r01"][1]
-        imgl = cv2.remap(img, rx - 32, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
+        scaleX = abs(pixelRect[2, 0] - pixelRect[1, 0]) / targetWidth
+        scaleY = abs(pixelRect[0, 1] - pixelRect[1, 1]) / targetHeight
+        rx = rx * scaleX + pixelRect[1, 0]
+        ry = ry * scaleY + pixelRect[1, 1]
+        imgl = cv2.remap(img, rx - 32, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT) #32mm
         imgr = cv2.remap(img, rx + 32, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         
         lrx = lut.lut[0, :, :, 2].astype(np.float32)
