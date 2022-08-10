@@ -135,6 +135,10 @@ class Camera(metaclass=abc.ABCMeta):
     @abc.abstractmethod
     def pixelToRectilinear(self, sideId: int, x: float, y: float) -> np.ndarray:
         return
+        
+    @abc.abstractmethod
+    def pixelsToRectilinear(self, sideId: int, coordinates: np.ndarray) -> np.ndarray:
+        return
     
     @property
     @abc.abstractmethod
@@ -149,6 +153,11 @@ class Camera(metaclass=abc.ABCMeta):
     @property
     @abc.abstractmethod
     def undistort(self) -> bool:
+        return
+        
+    @property
+    @abc.abstractmethod
+    def baseline(self) -> float:
         return
         
     @undistort.setter
@@ -174,8 +183,8 @@ class T265Camera(Camera):
         return self.read(peek=True)[1] is not None
     
     @property
-    def fisheye(self):
-        return True
+    def baseline(self):
+        return self.calibration["baseline"]
         
     @property
     def undistort(self):

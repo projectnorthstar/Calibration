@@ -422,8 +422,9 @@ class CalibrationWidget(QWidget):
         scaleY = abs(pixelRect[0, 1] - pixelRect[1, 1]) / targetHeight
         rx = rx * scaleX + pixelRect[1, 0]
         ry = ry * scaleY + pixelRect[1, 1]
-        imgl = cv2.remap(img, rx - 32, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT) #32mm
-        imgr = cv2.remap(img, rx + 32, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
+        cameraOffset = self.selectedCamera.baseline * 500 #half baseline in mm
+        imgl = cv2.remap(img, rx - cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
+        imgr = cv2.remap(img, rx + cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         
         lrx = lut.lut[0, :, :, 2].astype(np.float32)
         lry = (65535 - lut.lut[0, :, :, 1].astype(np.float32)) #flip y bcs opencv...
