@@ -263,7 +263,6 @@ if __name__=="__main__":
         print(cam.pixelsToRectilinear(1, pointsMat))
         print()
         print(cam.calibration)
-        print(cam.fisheye)
         print(cam.undistort)
         print(cam.resolution)
         print(cam.ready)
