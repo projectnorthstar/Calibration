@@ -99,8 +99,8 @@ if __name__ == "__main__":
             r, t = kabsch(allPositions[i], allPositions[0])
             print("From:", type(cameras[0]).__name__, "to:", type(cameras[i]).__name__)
             print("Unity")
-            print("R (parent): ", rotToEuler(r))
-            print("T (local): ", t * (1, -1, 1)) #OpenCV to Unity
+            print("r: ", rotToEuler(r) * (-1, 1, -1)) #Flipped y OpenCV to Unity
+            print("t: ", t * (1, -1, 1)) #Flipped y OpenCV to Unity
             print("OpenCV")
             print("r =",np.array2string(r, separator=','))
             print("t =",np.array2string(t, separator=','))
