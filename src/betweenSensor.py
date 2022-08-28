@@ -8,8 +8,7 @@ import argparse
 
 def kabsch(canonical_points, predicted_points):
     """
-    rotation from preditcted to canonical
-    translation from predicted to canonical
+    canonical @ rotation.T + translation are close to predicted
     """
     canonical_mean = np.mean(canonical_points, axis=0)
     predicted_mean = np.mean(predicted_points, axis=0)
@@ -97,7 +96,11 @@ if __name__ == "__main__":
             np.savetxt(f"points_{type(cam).__name__}.csv", allPositions[i], delimiter=",")
 
         if i > 0:
-            r, t = kabsch(allPositions[0], allPositions[i])
+            r, t = kabsch(allPositions[i], allPositions[0])
             print("From:", type(cameras[0]).__name__, "to:", type(cameras[i]).__name__)
+            print("Unity")
             print("R (parent): ", rotToEuler(r))
             print("T (local): ", t * (1, -1, 1)) #OpenCV to Unity
+            print("OpenCV")
+            print("r =",np.array2string(r, separator=','))
+            print("t =",np.array2string(t, separator=','))
