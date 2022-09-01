@@ -79,7 +79,7 @@ class CameraThread(threading.Thread, metaclass=abc.ABCMeta):
         self.frameMutex.release()
         return ret
 
-class IntelCameraThread (CameraThread):
+class IntelCameraThread(CameraThread):
     
     def __init__(self):
         super().__init__()
@@ -167,8 +167,85 @@ class IntelCameraThread (CameraThread):
     def _tstop(self):
         self.pipe.stop()
         return
+    
+class LeapMotionThread(CameraThread):
+    
+    def __init__(self):
+        super().__init__()
+        self.imageSize = 0
+        self.distortionMapSize = 0
+        self.ntries = 50
+        self.lib = None
+        self.baseline = 0
+        return
         
-class XvisioCameraThread (CameraThread):
+    @property
+    def resolution(self):
+        return (self.lib.GetImageHeight(0), self.lib.GetImageWidth(0) * 2)
+        
+    @property
+    def exposure(self):
+        return 0 #TODO
+        
+    @exposure.setter
+    def exposure(self, value):
+        #TODO
+        return
+        
+    def _tinit(self):
+        self.lib = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), r"libs\ultraleap\LeapService.dll"))
+        
+        self.lib.PixelToRectilinear.argtypes = [c_uint, c_float, c_float, c_bool]
+        self.lib.PixelToRectilinear.restype = POINTER(c_float * 3)
+        self.lib.GetBaseline.restype = c_float
+        
+        self.lib.Start()
+        
+        triesRemaining = self.ntries
+        while(self.lib.GetImageSize() == 0 or triesRemaining > 1):
+            time.sleep(0.1)
+            triesRemaining -= 1
+        if triesRemaining == 0:
+            raise Exception("No frames received")
+            
+        self.baseline = self.lib.GetBaseline()
+        self.undistortionMaps = [self._getDistortionMap(0), self._getDistortionMap(1)]
+        return
+        
+    def pixelToRectilinear(self, sideId, x, y, undistorted=False):
+        return np.array(self.lib.PixelToRectilinear(sideId, x, y, undistorted).contents, dtype=np.float32)
+        
+    def getCameraMatrix(self, sideId):
+        return np.eye(3) #TODO
+        
+    def _getDistortionMap(self, sideId):
+        if self.distortionMapSize != self.lib.GetDistortionMapSize():
+            self.distortionMapSize = self.lib.GetDistortionMapSize()
+            self.lib.GetDistortionMap.restype = POINTER(c_float * self.distortionMapSize)
+        dm = np.array(self.lib.GetDistortionMap(sideId).contents, dtype=np.float32).reshape(64, 64, 2)
+        dm[:,:, 1] = 1 - dm[:, :, 1]
+        dm *= 383 #TODO
+        dm = cv2.resize(dm, (self.lib.GetImageHeight(sideId), self.lib.GetImageWidth(sideId)))
+        return dm
+        
+    def _readLeftRightImage(self, undistort):
+        if self.imageSize != self.lib.GetImageSize():
+            self.imageSize = self.lib.GetImageSize()
+            self.lib.GetImageData.restype = POINTER(c_byte * self.imageSize * 2)
+        data = self.lib.GetImageData()
+        if data:
+            leftRightImage = np.array(self.lib.GetImageData().contents, dtype=np.uint8).reshape(2, self.lib.GetImageHeight(0), self.lib.GetImageWidth(0))
+            if undistort is True:
+                for i, side in enumerate(("left", "right")):
+                    leftRightImage[i] = cv2.remap(leftRightImage[i], self.undistortionMaps[i][:,:, 0], self.undistortionMaps[i][:,:, 1], cv2.INTER_LINEAR)
+            return leftRightImage
+        return None
+        
+    def _tstop(self):
+        self.lib.Stop()
+        return
+    
+class XvisioCameraThread(CameraThread):
     
     def __init__(self):
         super().__init__()
@@ -455,10 +532,80 @@ class T265Camera(Camera):
         
     def leftRightToDevice(self, leftRightPosition):
         return np.mean(leftRightPosition, axis=0)
-6
+
+class LeapCamera(Camera):
+    
+    def __init__(self, undistort = False):
+        self.cameraThread = LeapMotionThread()
+        self.undistort = undistort
+        self.cameraThread.start()
+        return
+
+    @property
+    def isAlive(self):
+        return self.cameraThread.is_alive()
+
+    @property
+    def ready(self):
+        return self.read(peek=True)[1] is not None
+    
+    @property
+    def baseline(self):
+        return self.cameraThread.baseline
+        
+    @property
+    def undistort(self):
+        return self.cameraThread.undistort
+        
+    @undistort.setter
+    def undistort(self, value):
+        self.cameraThread.undistort = value
+        return
+       
+    @property
+    def exposure(self):
+        return self.cameraThread.exposure
+        
+    @exposure.setter
+    def exposure(self, value):
+        self.cameraThread.exposure = value
+        return
+        
+    @property
+    def resolution(self):
+        return self.cameraThread.resolution
+        
+    def read(self, peek=False):
+        return self.cameraThread.read(peek)
+        
+    def release(self):
+        self.cameraThread.stop()
+        self.cameraThread.join()
+        return
+
+    def getCameraMatrix(self, sideId):
+        return self.cameraThread.getCameraMatrix(sideId)
+
+    def pixelToRectilinear(self, sideId, x, y):
+        return self.cameraThread.pixelToRectilinear(sideId, x, y, self.undistort)[:2]
+        
+    def leftPixelToRectilinear(self, coordinate):
+        return self.pixelToRectilinear(0, coordinate[0], coordinate[1])
+        
+    def rightPixelToRectilinear(self, coordinate):
+        return self.pixelToRectilinear(1, coordinate[0], coordinate[1])
+        
+    def pixelsToRectilinear(self, sideId, coordinates): #TODO
+        func = self.leftPixelToRectilinear if sideId == 0 else self.rightPixelToRectilinear
+        return np.apply_along_axis(func, -1, coordinates).reshape(coordinates.shape) #[1,N,2] or [N,1,2]
+        
+    def leftRightToDevice(self, leftRightPosition):
+        return np.mean(leftRightPosition, axis=0)
+
 if __name__=="__main__":
     #cam = T265Camera()
-    cam = XvisioCamera()
+    #cam = XvisioCamera()
+    cam = LeapCamera(True)
     try:
         print(cam.ready)
         while cam.ready is False:

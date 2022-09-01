@@ -1,4 +1,4 @@
-from utils.cameras import T265Camera, XvisioCamera
+from utils.cameras import T265Camera, XvisioCamera, LeapCamera
 import time
 import cv2
 import sys
@@ -36,8 +36,31 @@ def kabsch(canonical_points, predicted_points):
 if __name__ == "__main__":
     
     supportedCameras = {
-        "T26x": T265Camera,
-        "Xvisio": XvisioCamera
+        "T26x": {
+            "cls": T265Camera,
+            "kwargs": {
+                "undistort": True
+            }
+        },
+        "Xvisio": {
+            "cls": XvisioCamera,
+            "kwargs": {
+                "undistort": True
+            }
+        },
+        "Leap": {
+            "cls": LeapCamera,
+            "kwargs": {
+                "undistort": False
+            },
+            "undistortCorners": True
+        }
+    }
+    
+    cameraKwargs = {
+        "T26x": {"undistort": True},
+        "Xvisio": {"undistort": True},
+        "Leap": {"undistort": False}
     }
     
     parser = argparse.ArgumentParser(add_help=False)
@@ -54,7 +77,13 @@ if __name__ == "__main__":
     arucoParams = cv2.aruco.DetectorParameters_create()
     arucoParams.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
     
-    cameras = tuple(supportedCameras[key](undistort=True) for key in args.sensors)
+    cameras = []
+    undistortCorners = []
+    for key in args.sensors:
+        sc = supportedCameras[key]
+        cam = sc["cls"](**sc["kwargs"])
+        cameras.append(cam)
+        undistortCorners.append(sc.get("undistortCorners") is True)
     
     while not all(cam.ready for cam in cameras):
         time.sleep(1)
@@ -71,15 +100,19 @@ if __name__ == "__main__":
             for j, frame in enumerate(np.hsplit(frames[i], 2)):
                 color = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
                 corners, ids, rejectedImgPoints = cv2.aruco.detectMarkers(frame, arucoDict, parameters=arucoParams)
-                color = cv2.aruco.drawDetectedMarkers(color, corners, borderColor=(0, 0, 255))
                 if len(corners) > 0:
+                    color = cv2.aruco.drawDetectedMarkers(color, corners, borderColor=(0, 0, 255))
+                    if undistortCorners[i] is True:
+                        func = cam.leftPixelToRectilinear if j == 0 else cam.rightPixelToRectilinear
+                        corners = np.apply_along_axis(func, -1, corners)
                     cm = cam.getCameraMatrix(j)
                     dc = np.zeros(5)
                     rvecs, tvecs, objpts = cv2.aruco.estimatePoseSingleMarkers(corners, args.length, cm, dc)
                     for k, tvec in enumerate(tvecs):
                         rvec = rvecs[k]
                         positions.append(tvec[0])
-                    color = cv2.drawFrameAxes(color, cm, dc, rvec, tvec, 0.05)
+                    if undistortCorners[i] is not True: #would not work
+                        color = cv2.drawFrameAxes(color, cm, dc, rvec, tvec, 0.05)
                 cv2.imshow(f"{type(cam).__name__}_{j}", color)
             if len(positions) == 2:
                 perCamPosition.append(cam.leftRightToDevice(positions))
