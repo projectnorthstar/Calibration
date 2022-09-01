@@ -57,12 +57,6 @@ if __name__ == "__main__":
         }
     }
     
-    cameraKwargs = {
-        "T26x": {"undistort": True},
-        "Xvisio": {"undistort": True},
-        "Leap": {"undistort": False}
-    }
-    
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-h', '--help', help='Show help message and exit', action='store_true')
     parser.add_argument('-r', '--record', help='Record to csv', action='store_true')
