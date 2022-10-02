@@ -1,4 +1,5 @@
 from utils.cameras import T265Camera, XvisioCamera, LeapCamera
+from utils.trackers import Alt
 import time
 import cv2
 import sys
@@ -32,14 +33,21 @@ def kabsch(canonical_points, predicted_points):
     translation = np.dot(rotation, translation) - np.dot(rotation, predicted_mean) + predicted_mean
 
     return rotation, translation
+    
+def affine3D(canonical_points, predicted_points):
+    res, scale = cv2.estimateAffine3D(np.array(canonical_points), np.array(predicted_points), force_rotation = True)
+    return res[0:3, 0:3], res[0:3, 3:4].ravel() * scale
 
 if __name__ == "__main__":
+    
+    alignmentFunc = affine3D #affine3D (uses scaling) or kabsch (no scaling)
     
     supportedCameras = {
         "T26x": {
             "cls": T265Camera,
             "kwargs": {
-                "undistort": True
+                "undistort": True,
+                "exposure": 25000
             }
         },
         "Xvisio": {
@@ -57,10 +65,17 @@ if __name__ == "__main__":
         }
     }
     
+    supportedTrackers = {
+        "Alt": {
+            "cls": Alt,
+            "kwargs" : {}
+        }
+    }
+    
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument('-h', '--help', help='Show help message and exit', action='store_true')
     parser.add_argument('-r', '--record', help='Record to csv', action='store_true')
-    parser.add_argument('-s', '--sensors', help=f"List of sensors ({'|'.join(supportedCameras.keys())})...", nargs='+', required=True)
+    parser.add_argument('-s', '--sensors', help=f"List of sensors ({'|'.join(list(supportedCameras.keys()) + list(supportedTrackers.keys()))})...", nargs='+', required=True)
     parser.add_argument('-l', '--length', help='Marker length', type=float, default=0.1)
     if len(sys.argv) == 1:
         parser.print_help()
@@ -71,29 +86,44 @@ if __name__ == "__main__":
     arucoParams = cv2.aruco.DetectorParameters_create()
     arucoParams.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
     
-    cameras = []
+    trackersId = []
+    camerasId = []
+    sensors = []
     undistortCorners = []
-    for key in args.sensors:
-        sc = supportedCameras[key]
-        cam = sc["cls"](**sc["kwargs"])
-        cameras.append(cam)
-        undistortCorners.append(sc.get("undistortCorners") is True)
+    for i, key in enumerate(args.sensors):
+        sensor = None
+        if key in supportedCameras:
+            sc = supportedCameras[key]
+            sensor = sc["cls"](**sc["kwargs"])
+            camerasId.append(i)
+            undistortCorners.append(sc.get("undistortCorners") is True)
+        elif key in supportedTrackers:
+            sc = supportedTrackers[key]
+            sensor = sc["cls"](**sc["kwargs"])
+            trackersId.append(i)
+        else:
+            raise RuntimeError(f"Sensor {key} not supported")
+        sensors.append(sensor)
+    camerasId = tuple(camerasId)
+    trackersId = tuple(trackersId)
+    sensors = tuple(sensors)
     
-    while not all(cam.ready for cam in cameras):
+    while not all(sensors[camId].ready for camId in camerasId):
         time.sleep(1)
         
-    allPositions = [[] for _ in range(len(cameras))]
+    allPositions = [[] for _ in range(len(sensors))]
     while True:
         waitedKey = cv2.waitKey(10)
-        frames = [None] * len(cameras)
-        for i, cam in enumerate(cameras):
-            _, frames[i] = cam.read(peek=True)
-        perCamPosition = []
-        for i, cam in enumerate(cameras):
+        frames = [sensors[camId].read(peek=True)[1] for camId in camerasId]
+        poses = [sensors[tId].getPose() for tId in trackersId]
+        perSensorPosition = [None] * len(sensors)
+        for i, cid in enumerate(camerasId):
+            cam = sensors[cid]
             positions = []
             for j, frame in enumerate(np.hsplit(frames[i], 2)):
                 color = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
                 corners, ids, rejectedImgPoints = cv2.aruco.detectMarkers(frame, arucoDict, parameters=arucoParams)
+                corners = [corner for ic, corner in enumerate(corners) if ids[ic] == 5]
                 if len(corners) > 0:
                     color = cv2.aruco.drawDetectedMarkers(color, corners, borderColor=(0, 0, 255))
                     if undistortCorners[i] is True:
@@ -109,25 +139,38 @@ if __name__ == "__main__":
                         color = cv2.drawFrameAxes(color, cm, dc, rvec, tvec, 0.05)
                 cv2.imshow(f"{type(cam).__name__}_{j}", color)
             if len(positions) == 2:
-                perCamPosition.append(cam.leftRightToDevice(positions))
-        if len(perCamPosition) == len(cameras):
-            for i, position in enumerate(perCamPosition):
+                perSensorPosition[cid] = cam.leftRightToDevice(positions)
+        for i, tid in enumerate(trackersId):
+            tracker = sensors[tid]
+            valid, rot, pos = poses[i]
+            if valid is True:
+                position = (np.zeros(3) - pos) @ rot #origin 0, 0, 0
+                position[1] *= -1 #Flipped y Unity to OpenCV #TODO move to trackers, each sensor should follow OpenCV
+                perSensorPosition[tid] = position
+        if all(pos is not None for pos in perSensorPosition):
+            for i, position in enumerate(perSensorPosition):
                 allPositions[i].append(position)
         if waitedKey == ord("q"):
             break
             
-    for i, cam in enumerate(cameras):
-        cam.release()
-        
-        if args.record is True:
-            np.savetxt(f"points_{type(cam).__name__}.csv", allPositions[i], delimiter=",")
+    for i, sensor in enumerate(sensors):
+        sensor.release()
+    
+    print(f"{len(allPositions[0])} samples recorded")
+    if len(allPositions[0]) > 0:
+        for i, sensor in enumerate(sensors):
+            if args.record is True:
+                np.savetxt(f"points_{type(sensor).__name__}.csv", allPositions[i], delimiter=",")
 
-        if i > 0:
-            r, t = kabsch(allPositions[i], allPositions[0])
-            print("From:", type(cameras[0]).__name__, "to:", type(cameras[i]).__name__)
-            print("Unity")
-            print("r: ", rotToEuler(r) * (-1, 1, -1)) #Flipped y OpenCV to Unity
-            print("t: ", t * (1, -1, 1)) #Flipped y OpenCV to Unity
-            print("OpenCV")
-            print("r =",np.array2string(r, separator=','))
-            print("t =",np.array2string(t, separator=','))
+            if i > 0:
+                r, t = alignmentFunc(allPositions[i], allPositions[0])
+                print("From:", type(sensors[0]).__name__, "to:", type(sensors[i]).__name__)
+                print("Unity")
+                ru = rotToEuler(r) * (-1, 1, -1) #Flipped y OpenCV to Unity
+                tu = t * (1, -1, 1) #Flipped y OpenCV to Unity
+                print("r: ", f"Vector3({','.join(str(x) for x in ru)})")
+                print("t: ", f"Vector3({','.join(str(x) for x in tu)})")
+                print("OpenCV")
+                print("r =", np.array2string(r, separator=','))
+                print("t =", np.array2string(t, separator=','))
+    
