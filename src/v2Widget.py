@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QVBoxLayout, QLabel
 from forms.v2Form import Ui_V2Form
 
 from utils.polyHelpers import calcCoeffs
-from utils.cameras import T265Camera
+from utils.cameras import T265Camera, XvisioCamera
 from utils.lut import LookupTable
 from utils.transformHelpers import viewportToWorld, worldToPixel
 
@@ -286,7 +286,8 @@ class CalibrationWidget(QWidget):
         
         self.selectedCamera = None
         self.supportedCameras = (
-            ("T265/1", T265Camera),
+            ("T26x", T265Camera),
+            ("Xvisio", XvisioCamera)
         )
         self.coroutines = {}
         

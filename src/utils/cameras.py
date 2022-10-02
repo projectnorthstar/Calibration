@@ -134,7 +134,15 @@ class IntelCameraThread(CameraThread):
             "right" : streams["right"].get_intrinsics()
         }
         self.calibration = {}
-        for key in intrinsics:
+        
+        extrinsics = streams["left"].get_extrinsics_to(streams["right"])
+        R = np.reshape(extrinsics.rotation, (3, 3)).T
+        T = np.array(extrinsics.translation)
+        self.calibration["R1"] = np.eye(3)
+        self.calibration["R2"] = R
+        self.calibration["baseline"] = np.linalg.norm(T)
+        
+        for ii, key in enumerate(intrinsics):
             i = intrinsics[key]
             cm = self.calibration[key + "CameraMatrix"] = np.array([
                 [i.fx, 0, i.ppx],
@@ -142,13 +150,7 @@ class IntelCameraThread(CameraThread):
                 [0, 0, 1]
             ])
             dc = self.calibration[key + "DistCoeffs"] = np.array(i.coeffs[:4])
-            self.calibration[key + "Map"] = cv2.fisheye.initUndistortRectifyMap(cm, dc, None, cm, (i.width, i.height), cv2.CV_32FC1)
-        extrinsics = streams["left"].get_extrinsics_to(streams["right"])
-        R = np.reshape(extrinsics.rotation, (3, 3)).T
-        T = np.array(extrinsics.translation)
-        self.calibration["R1"] = np.eye(3)
-        self.calibration["R2"] = R
-        self.calibration["baseline"] = np.linalg.norm(T)
+            self.calibration[key + "Map"] = cv2.fisheye.initUndistortRectifyMap(cm, dc, self.calibration[f"R{ii + 1}"], cm, (i.width, i.height), cv2.CV_32FC1)
         return
         
     def _readLeftRightImage(self, undistort):
@@ -195,7 +197,7 @@ class LeapMotionThread(CameraThread):
     def _tinit(self):
         self.lib = cdll.LoadLibrary(os.path.join(os.path.dirname(__file__), r"libs\ultraleap\LeapService.dll"))
         
-        self.lib.PixelToRectilinear.argtypes = [c_uint, c_float, c_float, c_bool]
+        self.lib.PixelToRectilinear.argtypes = [c_uint, c_float, c_float]
         self.lib.PixelToRectilinear.restype = POINTER(c_float * 3)
         self.lib.GetBaseline.restype = c_float
         
@@ -213,7 +215,8 @@ class LeapMotionThread(CameraThread):
         return
         
     def pixelToRectilinear(self, sideId, x, y, undistorted=False):
-        return np.array(self.lib.PixelToRectilinear(sideId, x, y, undistorted).contents, dtype=np.float32)
+        #TODO currently undistorted ignored
+        return np.array(self.lib.PixelToRectilinear(sideId, x, y).contents, dtype=np.float32)
         
     def getCameraMatrix(self, sideId):
         return np.eye(3) #TODO
@@ -224,8 +227,9 @@ class LeapMotionThread(CameraThread):
             self.lib.GetDistortionMap.restype = POINTER(c_float * self.distortionMapSize)
         dm = np.array(self.lib.GetDistortionMap(sideId).contents, dtype=np.float32).reshape(64, 64, 2)
         dm[:,:, 1] = 1 - dm[:, :, 1]
-        dm *= 383 #TODO
-        dm = cv2.resize(dm, (self.lib.GetImageHeight(sideId), self.lib.GetImageWidth(sideId)))
+        dm[:,:, 0] *= self.lib.GetImageWidth(sideId) - 1
+        dm[:,:, 1] *= self.lib.GetImageHeight(sideId) - 1
+        dm = cv2.resize(dm, (self.lib.GetImageWidth(sideId), self.lib.GetImageHeight(sideId)))
         return dm
         
     def _readLeftRightImage(self, undistort):
@@ -460,11 +464,13 @@ class XvisioCamera(Camera):
         
 class T265Camera(Camera):
 
-    def __init__(self, undistort = True):
+    def __init__(self, undistort = True, exposure = None):
         self.sides = ("left", "right")
         self.cameraThread = IntelCameraThread()
         self.undistort = undistort
         self.cameraThread.start()
+        if exposure is not None:
+            self.cameraThread._exposure = exposure
         return
 
     @property
@@ -524,7 +530,7 @@ class T265Camera(Camera):
         cameraMatrix = self.getCameraMatrix(sideId)
         r = self.calibration[f"R{sideId + 1}"]
         if self.undistort is True:
-            return cv2.undistortPoints(coordinates, cameraMatrix, np.zeros(5), R=r).reshape(coordinates.shape) #same as backproject, reshape added to match input shape
+            return cv2.undistortPoints(coordinates, cameraMatrix, np.zeros(5)).reshape(coordinates.shape) #same as backproject, reshape added to match input shape
         else:
             distCoeffs = self.calibration[self.sides[sideId] + "DistCoeffs"]
             return cv2.fisheye.undistortPoints(coordinates, cameraMatrix, distCoeffs, R=r).reshape(coordinates.shape)
