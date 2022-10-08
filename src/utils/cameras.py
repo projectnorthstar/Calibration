@@ -259,6 +259,7 @@ class XvisioCameraThread(CameraThread):
         self.lib = None
         self.baseline = 0
         self.depthParameter = 0
+        self._exposure = 15000 #TODO
         return
         
     @property
@@ -267,11 +268,13 @@ class XvisioCameraThread(CameraThread):
         
     @property
     def exposure(self):
-        return 0 #TODO
+        return self._exposure
         
     @exposure.setter
     def exposure(self, value):
-        #TODO
+        if self._exposure != value:
+            self._exposure = value
+            self.lib.SetGainExposure(25, int(self._exposure / 1000.0))
         return
         
     def _tinit(self):
@@ -283,7 +286,7 @@ class XvisioCameraThread(CameraThread):
         self.lib.GetDepthParameter.restype = c_float
         self.lib.GetCameraMatrix.restype = POINTER(c_float * 9)
         self.lib.GetCameraExtrinsic.restype = POINTER(c_float * 12)
-        
+        self.lib.SetGainExposure.argtypes = [c_int, c_int]
         self.lib.Start()
         
         triesRemaining = self.ntries
