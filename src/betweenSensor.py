@@ -53,7 +53,8 @@ if __name__ == "__main__":
         "Xvisio": {
             "cls": XvisioCamera,
             "kwargs": {
-                "undistort": True
+                "undistort": True,
+                "exposure": 15000
             }
         },
         "Leap": {

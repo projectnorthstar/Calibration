@@ -101,10 +101,9 @@ class IntelCameraThread(CameraThread):
         
     @exposure.setter
     def exposure(self, value):
-        if self._exposure != value:
-            self._exposure = value
-            if self.sensor is not None:
-                self.sensor.set_option(rs.option.exposure, self._exposure)
+        self._exposure = value
+        if self.sensor is not None:
+            self.sensor.set_option(rs.option.exposure, self._exposure)
         return
         
     def _tinit(self):
@@ -259,7 +258,7 @@ class XvisioCameraThread(CameraThread):
         self.lib = None
         self.baseline = 0
         self.depthParameter = 0
-        self._exposure = 15000 #TODO
+        self._exposure = 10000 #TODO
         return
         
     @property
@@ -272,8 +271,8 @@ class XvisioCameraThread(CameraThread):
         
     @exposure.setter
     def exposure(self, value):
-        if self._exposure != value:
-            self._exposure = value
+        self._exposure = value
+        if self.lib is not None:
             self.lib.SetGainExposure(25, int(self._exposure / 1000.0))
         return
         
@@ -288,6 +287,7 @@ class XvisioCameraThread(CameraThread):
         self.lib.GetCameraExtrinsic.restype = POINTER(c_float * 12)
         self.lib.SetGainExposure.argtypes = [c_int, c_int]
         self.lib.Start()
+        self.exposure = self._exposure #set value from init once initialized
         
         triesRemaining = self.ntries
         while(self.lib.GetImageSize() == 0 or triesRemaining > 1):
@@ -391,9 +391,11 @@ class Camera(metaclass=abc.ABCMeta):
         
 class XvisioCamera(Camera):
     
-    def __init__(self, undistort = True):
+    def __init__(self, undistort = True, exposure = None):
         self.cameraThread = XvisioCameraThread()
         self.undistort = undistort
+        if exposure is not None:
+            self.cameraThread._exposure = exposure
         self.cameraThread.start()
         return
 
@@ -471,9 +473,9 @@ class T265Camera(Camera):
         self.sides = ("left", "right")
         self.cameraThread = IntelCameraThread()
         self.undistort = undistort
-        self.cameraThread.start()
         if exposure is not None:
             self.cameraThread._exposure = exposure
+        self.cameraThread.start()
         return
 
     @property
