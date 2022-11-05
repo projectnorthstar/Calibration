@@ -1,4 +1,4 @@
-from utils.cameras import T265Camera, XvisioCamera, LeapCamera
+from utils.cameras import T265Camera, XvisioCamera, LeapCamera, Cv2Camera
 from utils.trackers import Alt
 import time
 import cv2
@@ -63,6 +63,13 @@ if __name__ == "__main__":
                 "undistort": False
             },
             "undistortCorners": True
+        },
+        "ELP": {
+            "cls": Cv2Camera,
+            "kwargs": {
+                "index": 1,
+                "exposure": -3
+            }
         }
     }
     

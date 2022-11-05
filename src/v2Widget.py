@@ -11,7 +11,7 @@ from PySide6.QtWidgets import QVBoxLayout, QLabel
 from forms.v2Form import Ui_V2Form
 
 from utils.polyHelpers import calcCoeffs
-from utils.cameras import T265Camera, XvisioCamera
+from utils.cameras import T265Camera, XvisioCamera, Cv2Camera
 from utils.lut import LookupTable
 from utils.transformHelpers import viewportToWorld, worldToPixel
 
@@ -285,14 +285,46 @@ class CalibrationWidget(QWidget):
         self.ui.setupUi(self)
         
         self.selectedCamera = None
-        self.supportedCameras = (
-            ("T26x", T265Camera),
-            ("Xvisio", XvisioCamera)
-        )
+        self.supportedCameras = {
+            "T26x": {
+                "cls": T265Camera,
+                "kwargs": {},
+                "exposure": {
+                    "minimum": 200,
+                    "maximum": 30000,
+                    "singleStep": 1,
+                    "value": 10000
+                }
+            },
+            "Xvisio": {
+                "cls": XvisioCamera,
+                "kwargs": {},
+                "exposure": {
+                    "minimum": 200,
+                    "maximum": 30000,
+                    "singleStep": 1,
+                    "value": 10000
+                }
+            },
+            "ELP": {
+                "cls": Cv2Camera,
+                "kwargs": {
+                    "index": 1
+                },
+                "exposure": {
+                    "minimum": -8,
+                    "maximum": -2,
+                    "singleStep": 1,
+                    "value": -5
+                }
+            }
+        }
+        self.cameraKeys = tuple(self.supportedCameras.keys())
+        
         self.coroutines = {}
         
         deviceCB = self.ui.deviceComboBox
-        deviceCB.addItems((cam[0] for cam in self.supportedCameras))
+        deviceCB.addItems(self.cameraKeys)
         deviceCB.setCurrentIndex(-1)
         deviceCB.currentIndexChanged.connect(self.setupCamera)
         
@@ -358,7 +390,15 @@ class CalibrationWidget(QWidget):
     def setupCamera(self, cameraIndex):
         if self.selectedCamera is not None:
             self.selectedCamera.release()
-        self.selectedCamera = self.supportedCameras[cameraIndex][1]()
+        sc = self.supportedCameras[self.cameraKeys[cameraIndex]]
+        self.selectedCamera = sc["cls"](**sc["kwargs"])
+        
+        #adjust controls to camera
+        self.ui.exposureSlider.setMinimum(sc["exposure"]["minimum"])
+        self.ui.exposureSlider.setMaximum(sc["exposure"]["maximum"])
+        self.ui.exposureSlider.setValue(sc["exposure"]["value"])
+        self.ui.exposureSlider.setSingleStep(sc["exposure"]["singleStep"])
+        
         #init camera according to GUI
         self.onUndistortStateChanged(self.ui.undistortCheckBox.checkState())
         self.onExposureValueChanged(self.ui.exposureSlider.value())
