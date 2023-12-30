@@ -164,7 +164,7 @@ class CalibrationManager(Borg):
             screen.setImage(displayedBuffer)
             yield
             frame = yield from self.captureNewFrameRoutine(camera)
-            if i % 2 is 0:
+            if i % 2 == 0:
                 displayedBuffer = (1 - bits[:, :, bitIndex]) * brightness
             else:
                 displayedBuffer = bits[:, :, bitIndex] * brightness
@@ -177,7 +177,7 @@ class CalibrationManager(Borg):
         for i in range(15):
             bitIndex = (i + 1) // 2
             frame = frames[i]
-            if i % 2 is 0:
+            if i % 2 == 0:
                 darkFrameBuffer = frame
             else:
                 bitmask = self.createMask((frame, darkFrameBuffer), 1)
