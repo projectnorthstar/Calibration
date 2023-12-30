@@ -53,19 +53,19 @@ def calcCoeffs(sideId, data, pixToRectFunc, polynomialDegree=3):
 
 
   # Extract the Valid Measurements and arrange into a flat array
-  coordinates          = np.zeros((data.shape[0], data.shape[1], 2), dtype=np.int)  
+  coordinates          = np.zeros((data.shape[0], data.shape[1], 2), dtype=int)
   coordinates[:, :, 1] = np.arange(0, data.shape[0])[:, None]  # Prepare the coordinates Y
   coordinates[:, :, 0] = np.arange(0, data.shape[1])[None, :]  # Prepare the coordinates X
 
   # Sample the non-zero indices from the flattened coordinates and data arrays
   non_zero_indices     = np.nonzero(mask.reshape(-1))[0] # Get non-zero mask indices
-  non_zero_data = data[..., 1:].reshape(-1, 2)[non_zero_indices].astype(np.float) / 255
+  non_zero_data = data[..., 1:].reshape(-1, 2)[non_zero_indices].astype(float) / 255
 
   # Fit the polynomial to camera image pixels
-  #non_zero_coordinates = coordinates .reshape(-1, 2)[non_zero_indices].astype(np.float) / widthData.shape[0]
+  #non_zero_coordinates = coordinates .reshape(-1, 2)[non_zero_indices].astype(float) / widthData.shape[0]
 
   # Fit the polynomial to rectilinear coordinates
-  non_zero_pixel_coordinates = coordinates.reshape(-1, 1, 2)[non_zero_indices].astype(np.float)
+  non_zero_pixel_coordinates = coordinates.reshape(-1, 1, 2)[non_zero_indices].astype(float)
   non_zero_coordinates = pixToRectFunc(sideId, non_zero_pixel_coordinates).reshape(-1, 2)
 
   # Fit the multidimensional polynomials
