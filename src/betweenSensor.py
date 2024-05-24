@@ -90,8 +90,8 @@ if __name__ == "__main__":
         sys.exit(1)
     args = parser.parse_args()
     
-    arucoDict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
-    arucoParams = cv2.aruco.DetectorParameters_create()
+    arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    arucoParams = cv2.aruco.DetectorParameters()
     arucoParams.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
     
     trackersId = []
