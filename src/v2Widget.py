@@ -410,7 +410,7 @@ class CalibrationWidget(QWidget):
         self.ui.exposureSlider.setSingleStep(sc["exposure"]["singleStep"])
         
         #init camera according to GUI
-        self.onUndistortStateChanged(self.ui.undistortCheckBox.checkState())
+        self.onUndistortStateChanged(self.ui.undistortCheckBox.checkState().value)
         self.onExposureValueChanged(self.ui.exposureSlider.value())
         return
         
