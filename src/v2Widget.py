@@ -235,24 +235,34 @@ class Screen(ImageArea):
         
 class QImageArea(ImageArea):
     
-    def __init__(self, label):
+    def __init__(self, label, borderSize=0, borderColor=255):
         self.label = label
+        self.borderSize = borderSize
+        self.borderColor = borderColor
+        return
         
     def setImage(self, image):
         height, width = image.shape
+        if self.borderSize > 0:
+            image[height - self.borderSize:] = self.borderColor
+            image[:self.borderSize] = self.borderColor
+            image[:, width - self.borderSize:] = self.borderColor
+            image[:, :self.borderSize] = self.borderColor
+            halfWidth = width >> 1
+            image[:, halfWidth - self.borderSize:halfWidth + self.borderSize] = self.borderColor
         qImg = QImage(image.data, width, height, width, QImage.Format_Grayscale8)
         self.label.setPixmap(QPixmap(qImg))
         return
         
 class QPatternScreen(QImageArea, Screen):
     
-    def __init__(self):
-        QImageArea.__init__(self, QLabel())
+    def __init__(self, borderSize=0, borderColor=255):
+        QImageArea.__init__(self, QLabel(), borderSize, borderColor)
         self.widget = QWidget()
-        self.widget.setWindowState(Qt.WindowFullScreen)
+        #self.widget.setWindowState(Qt.WindowFullScreen)
         layout = QVBoxLayout()
         self.label.setPixmap(QPixmap(r"imgs\blank.png"))
-        sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy = QSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         self.label.setSizePolicy(sizePolicy)
         self.label.setScaledContents(True)
         layout.addWidget(self.label)
@@ -262,7 +272,7 @@ class QPatternScreen(QImageArea, Screen):
         return
         
     def show(self):
-        self.widget.show()
+        self.widget.showFullScreen()
         return
     
     def close(self):
@@ -343,7 +353,7 @@ class CalibrationWidget(QWidget):
         
         QTimer.singleShot(self.ui.displayDelaySpinBox.value(), self.coroutineUpdate)
         
-        self.patternScreen = QPatternScreen()
+        self.patternScreen = QPatternScreen(borderSize=1)
         self.patternScreen.show()
         
         self.cameraFeed = QImageArea(self.ui.cameraFeedLabel)
@@ -428,7 +438,8 @@ class CalibrationWidget(QWidget):
     def onDisplayIndexChanged(self, value):
         screen = self.app.screens()[value]
         self.displayResolution = (screen.size().width(), screen.size().height())
-        self.patternScreen.setGeometry(screen.geometry())
+        self.patternScreen.setGeometry(screen.availableGeometry())
+        self.patternScreen.show()
         return
         
     def onMaskThresholdChanged(self, value):
