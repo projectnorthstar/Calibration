@@ -310,7 +310,7 @@ class Ui_V2Form(object):
         self.groupBox_4.setTitle(QCoreApplication.translate("V2Form", u"Calibration", None))
         self.polyFitPushButton.setText(QCoreApplication.translate("V2Form", u"Fit a 3D polynomial", None))
         self.label_8.setText(QCoreApplication.translate("V2Form", u"File name", None))
-        self.fileNameLineEdit.setText(QCoreApplication.translate("V2Form", u"out.json", None))
+        self.fileNameLineEdit.setText(QCoreApplication.translate("V2Form", u"out\\V2Out.json", None))
         self.validatePushButton.setText(QCoreApplication.translate("V2Form", u"Validate", None))
         self.groupBox.setTitle(QCoreApplication.translate("V2Form", u"Mask", None))
         self.createMaskPushButton.setText(QCoreApplication.translate("V2Form", u"Create mask", None))

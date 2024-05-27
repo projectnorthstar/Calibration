@@ -3,6 +3,8 @@ import cv2
 import abc
 import typing
 import sys
+import os
+import json
 
 from PySide6.QtWidgets import QApplication, QWidget, QSizePolicy
 from PySide6.QtCore import QTimer, Qt, QRect
@@ -346,6 +348,7 @@ class CalibrationWidget(QWidget):
         self.ui.maskThresholdSlider.valueChanged.connect(self.onMaskThresholdChanged)
         self.ui.exposureSlider.valueChanged.connect(self.onExposureValueChanged)
         self.ui.displayIndexSpinBox.valueChanged.connect(self.onDisplayIndexChanged)
+        self.ui.savePushButton.pressed.connect(self.onSavePressed)
 
         self.appTimer = QTimer(self)
         self.appTimer.timeout.connect(self.update)
@@ -366,6 +369,9 @@ class CalibrationWidget(QWidget):
         
         #misc
         self.calibrationManager = CalibrationManager()
+
+        self.cal = None
+        self.lut = None
         return
         
     def coroutineUpdate(self):
@@ -457,14 +463,14 @@ class CalibrationWidget(QWidget):
         
     def onPolyFitPressed(self):
         #TODO
-        cal = self.calibrationManager.calibrateGreycodes(self.selectedCamera, self.calibrationManager.widthBits, self.calibrationManager.heightBits)
-        lut = LookupTable()
-        lut.loadCameraProperties(r"data\CameraProperties.json")
-        lut.fillLuT(cal)
+        self.cal = self.calibrationManager.calibrateGreycodes(self.selectedCamera, self.calibrationManager.widthBits, self.calibrationManager.heightBits)
+        self.lut = LookupTable()
+        self.lut.loadCameraProperties(r"data\CameraProperties.json")
+        self.lut.fillLuT(self.cal)
         
         targetResolution = (1440, 1600)
         targetWidth, targetHeight = targetResolution
-        pm = np.array(lut.cameraProperties["projectionMatrix"]).reshape((4,4))
+        pm = np.array(self.lut.cameraProperties["projectionMatrix"]).reshape((4,4))
         pixelRect = worldToPixel(viewportToWorld(pm, np.array(((0,0),(0,1),(1,1),(1,0))), -1), flipY=True)
         import cv2
         img = cv2.imread(r"imgs\charuco.png", cv2.IMREAD_GRAYSCALE)
@@ -478,10 +484,10 @@ class CalibrationWidget(QWidget):
         imgl = cv2.remap(img, rx - cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         imgr = cv2.remap(img, rx + cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         
-        lrx = lut.lut[0, :, :, 2].astype(np.float32)
-        lry = (65535 - lut.lut[0, :, :, 1].astype(np.float32)) #flip y bcs opencv...
-        rrx = lut.lut[1, :, :, 2].astype(np.float32)
-        rry = (65535 - lut.lut[1, :, :, 1].astype(np.float32))
+        lrx = self.lut.lut[0, :, :, 2].astype(np.float32)
+        lry = (65535 - self.lut.lut[0, :, :, 1].astype(np.float32)) #flip y bcs opencv...
+        rrx = self.lut.lut[1, :, :, 2].astype(np.float32)
+        rry = (65535 - self.lut.lut[1, :, :, 1].astype(np.float32))
         
         lrx = cv2.resize(lrx, targetResolution) #resize LuT to output res
         lry = cv2.resize(lry, targetResolution)
@@ -495,11 +501,29 @@ class CalibrationWidget(QWidget):
         
         img1 = cv2.remap(imgl, lrx, lry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         img2 = cv2.remap(imgr, rrx, rry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
-        
+
         self.resultArea.setImage(np.hstack((img1, img2)))
         self.patternScreen.setImage(np.hstack((img1, img2)))
-        print(cal)
-        print(CalibrationHelpers.calibration2GLSL(cal))
+
+        print(self.cal)
+        print(CalibrationHelpers.calibration2GLSL(self.cal))
+
+        self.ui.savePushButton.setEnabled(True)
+        return
+
+    def onSavePressed(self):
+        fileName = self.ui.fileNameLineEdit.text()
+        baseName = os.path.splitext(fileName)[0]
+        dirPath = os.path.dirname(fileName)
+        absPath = os.path.abspath(dirPath)
+        os.makedirs(dirPath, exist_ok=True)
+        with open(fileName, "w") as f:
+            json.dump(self.cal, f, indent=4)
+        stacked = np.hstack(self.lut.lut)
+        cv2.imwrite(f"{baseName}_left.png", self.lut.lut[0])
+        cv2.imwrite(f"{baseName}_right.png", self.lut.lut[1])
+        cv2.imwrite(f"{baseName}.png", stacked)
+        print(f"Calibration files saved at: {absPath}")
         return
 
 if __name__ == '__main__':
