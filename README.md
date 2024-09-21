@@ -1,5 +1,7 @@
 # PNSCalibrationTools
-The output of the *optical calibration* is only compatible with the [forked version of ProjectEsky-UnityIntegration](https://github.com/JurajVincur/ProjectEsky-UnityIntegration)
+The output of the *optical calibration* is compatible with:
+- [forked version of MixedRealityToolkit-Unity](https://github.com/JurajVincur/MixedRealityToolkit-Unity/tree/PNS)
+- [forked version of ProjectEsky-UnityIntegration](https://github.com/JurajVincur/ProjectEsky-UnityIntegration)
 
 The output of the *between-sensor calibration* provides local unity pose of *sensor i* which is supposed to be the child of the *sensor 0*. Index of the sensor is given by the order provided in command line arguments.
 
@@ -19,11 +21,12 @@ The output of the *between-sensor calibration* provides local unity pose of *sen
 6. Click on *Measure width bits* and wait for procedure to finish (a gradient image should appear in the bottom area)
 7. Click on *Measure height bits* and wait for procedure to finish (a new gradient image should appear in the bottom area)
 8. Click on *Fit a 3D polynomial* and wait for procedure to finish (a charuco board should appear in the bottom area)
-9. Copy calibration output (JSON part) from command prompt to the target file.
+9. Set *File name* and click on *Save*. This will save the calibration output to the target file.
+10. Update your Unity project with the new calibration data (if you're using the forked version of the MixedRealityToolkit-Unity, simply replace *V2Out.json* file in *Assets\V2Renderer\Data*).
 
 ## Between-sensor calibration
 1. Open a command prompt and change the current working directory to PNSCalibrationTools\src
 2. Run command *python betweenSensor.py -s SENSORS* where SENSORS is a space separated list of sensors
 3. Show a printed Aruco marker with the id 5 and a length of 10cm (other lengths can be configured via -l switch) to the sensors from different positions
 4. Hit q
-5. Copy printed positions and rotations to the Unity
+5. Update your Unity project with the new calibration data (if you're using the forked version of the MixedRealityToolkit-Unity, simply update the positions and rotations of the designated scene objects with the printed values).
