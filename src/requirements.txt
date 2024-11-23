@@ -6,3 +6,4 @@ PySide6-Addons==6.6.1
 PySide6-Essentials==6.6.1
 scipy==1.11.4
 shiboken6==6.6.1
+imageio==2.36.0

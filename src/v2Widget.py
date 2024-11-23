@@ -484,20 +484,20 @@ class CalibrationWidget(QWidget):
         imgl = cv2.remap(img, rx - cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         imgr = cv2.remap(img, rx + cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         
-        lrx = self.lut.lut[0, :, :, 2].astype(np.float32)
-        lry = (65535 - self.lut.lut[0, :, :, 1].astype(np.float32)) #flip y bcs opencv...
-        rrx = self.lut.lut[1, :, :, 2].astype(np.float32)
-        rry = (65535 - self.lut.lut[1, :, :, 1].astype(np.float32))
+        lrx = self.lut.lut[0, :, :, 2]
+        lry = 1 - self.lut.lut[0, :, :, 1] #flip y bcs opencv...
+        rrx = self.lut.lut[1, :, :, 2]
+        rry = 1 - self.lut.lut[1, :, :, 1]
         
         lrx = cv2.resize(lrx, targetResolution) #resize LuT to output res
         lry = cv2.resize(lry, targetResolution)
         rrx = cv2.resize(rrx, targetResolution)
         rry = cv2.resize(rry, targetResolution)
         
-        lrx = lrx / 65535 * (targetWidth - 1) #scale for mapping in input image
-        lry = lry / 65535 * (targetHeight - 1)
-        rrx = rrx / 65535 * (targetWidth - 1)
-        rry = rry / 65535 * (targetHeight - 1)
+        lrx = lrx * (targetWidth - 1) #scale for mapping in input image
+        lry = lry * (targetHeight - 1)
+        rrx = rrx * (targetWidth - 1)
+        rry = rry * (targetHeight - 1)
         
         img1 = cv2.remap(imgl, lrx, lry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         img2 = cv2.remap(imgr, rrx, rry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
@@ -520,9 +520,9 @@ class CalibrationWidget(QWidget):
         with open(fileName, "w") as f:
             json.dump(self.cal, f, indent=4)
         stacked = np.hstack(self.lut.lut)
-        cv2.imwrite(f"{baseName}_left.png", self.lut.lut[0])
-        cv2.imwrite(f"{baseName}_right.png", self.lut.lut[1])
-        cv2.imwrite(f"{baseName}.png", stacked)
+        self.lut.export(f"{baseName}_left.png", 0)
+        self.lut.export(f"{baseName}_right.png", 1)
+        self.lut.export(f"{baseName}.exr")
         print(f"Calibration files saved at: {absPath}")
         return
 

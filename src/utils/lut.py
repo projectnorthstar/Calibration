@@ -3,6 +3,9 @@ from utils.transformHelpers import worldToViewport
 import json
 import numpy as np
 import sys
+import imageio
+import os
+import cv2
 
 class ARRaytracer:
     
@@ -129,7 +132,7 @@ class ARRaytracer:
 class LookupTable:
 
     def __init__(self, resolution=(400, 360)):
-        self.lut = np.zeros((2, *resolution, 3), dtype=np.uint16)
+        self.lut = np.zeros((2, *resolution, 3), dtype=np.float32)
         self.cameraProperties = None
         return
         
@@ -160,7 +163,7 @@ class LookupTable:
             #flip y to convert it from opencv to unity coordinate space, flip z bcs camera's forward is the negative Z axis, see: https://docs.unity3d.com/ScriptReference/Camera-worldToCameraMatrix.html
             points[:, 1] = -np.polynomial.polynomial.polyval2d(u, v, yData[i].reshape((4,4)))
             points[:, 2] *= -1
-            rg = worldToViewport(pm, points) * 65535
+            rg = worldToViewport(pm, points)
             rg = rg.reshape((height, width, 2))
             self.lut[i, :, :, 2] = rg[:, :, 0]
             self.lut[i, :, :, 1] = rg[:, :, 1]
@@ -181,9 +184,37 @@ class LookupTable:
         
         self.fillLuT(data)
         return
+
+    def export(self, path, side=-1):
+        ext = os.path.splitext(path)[-1]
+        ext = ext[1:].lower()
+        funcs = {
+            "png": self.exportPNG,
+            "exr": self.exportEXR
+        }
+        if ext not in funcs:
+            raise ValueError(f"Invalid file extension, supported formats are: {tuple(funcs)}")
+        data = None
+        if side == -1:
+            data = np.hstack(self.lut)
+        elif -1 < side < 2:
+            data = self.lut[side]
+        else:
+            raise ValueError("Invalid argument provided, side value must be from <-1, 1>")
+        funcs[ext](path, data)
+        return
+
+    def exportEXR(self, path, data):
+        imageio.plugins.freeimage.download()
+        imageio.imwrite(path, data[:,:,::-1])
+        return
         
+    def exportPNG(self, path, data):
+        data = (data * 65535).astype(np.uint16)
+        cv2.imwrite(path, data)
+        return
+
 if __name__=="__main__":
-    import cv2
     lut = LookupTable()
     lut.loadCameraProperties(r"data\CameraProperties.json")
     lut.loadV2Calibration(r"data\V2Out.json")
@@ -192,7 +223,10 @@ if __name__=="__main__":
     cv2.imshow('lut_right', lut.lut[1])
     stacked = np.hstack(lut.lut)
     cv2.imshow('lut_stacked', stacked)
-    cv2.imwrite('lut_left.png', lut.lut[0])
-    cv2.imwrite('lut_right.png', lut.lut[1])
-    cv2.imwrite('lut.png', stacked)
+    lut.export('lut_left.exr', 0)
+    lut.export('lut_right.exr', 1)
+    lut.export('lut.exr')
+    lut.export('lut_left.png', 0)
+    lut.export('lut_right.png', 1)
+    lut.export('lut.png')
     cv2.waitKey(0)
