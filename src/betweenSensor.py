@@ -41,6 +41,8 @@ def affine3D(canonical_points, predicted_points):
 if __name__ == "__main__":
     
     alignmentFunc = affine3D #affine3D (uses scaling) or kabsch (no scaling)
+    arucoMarkerId = 854
+    aprilTagId = 18
     
     supportedCameras = {
         "T26x": {
@@ -76,7 +78,10 @@ if __name__ == "__main__":
     supportedTrackers = {
         "Alt": {
             "cls": Alt,
-            "kwargs" : {}
+            "kwargs" : {
+                "environmentData":"AntilatencyAltEnvironmentHorizontalGrid~AgAFBAAAAD-amZk-AAAAAM3MjD4AAAAAAAAAAADNzAw_AAIBAQEDAQE",
+                "placementData": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+            }
         }
     }
     
@@ -90,7 +95,7 @@ if __name__ == "__main__":
         sys.exit(1)
     args = parser.parse_args()
     
-    arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    arucoDict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_1000)
     arucoParams = cv2.aruco.DetectorParameters()
     arucoParams.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
     
@@ -131,7 +136,7 @@ if __name__ == "__main__":
             for j, frame in enumerate(np.hsplit(frames[i], 2)):
                 color = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
                 corners, ids, rejectedImgPoints = cv2.aruco.detectMarkers(frame, arucoDict, parameters=arucoParams)
-                corners = [corner for ic, corner in enumerate(corners) if ids[ic] == 5]
+                corners = [corner for ic, corner in enumerate(corners) if ids[ic] == arucoMarkerId]
                 if len(corners) > 0:
                     color = cv2.aruco.drawDetectedMarkers(color, corners, borderColor=(0, 0, 255))
                     if undistortCorners[i] is True:
@@ -142,19 +147,18 @@ if __name__ == "__main__":
                     rvecs, tvecs, objpts = cv2.aruco.estimatePoseSingleMarkers(corners, args.length, cm, dc)
                     for k, tvec in enumerate(tvecs):
                         rvec = rvecs[k]
+                        print(tvec[0])
                         positions.append(tvec[0])
                     if undistortCorners[i] is not True: #would not work
                         color = cv2.drawFrameAxes(color, cm, dc, rvec, tvec, 0.05)
-                cv2.imshow(f"{type(cam).__name__}_{j}", color)
+                cv2.imshow(f"{type(cam).__name__}_{j}", cv2.resize(color, (0, 0), fx = 0.5, fy = 0.5))
             if len(positions) == 2:
                 perSensorPosition[cid] = cam.leftRightToDevice(positions)
         for i, tid in enumerate(trackersId):
             tracker = sensors[tid]
-            valid, rot, pos = poses[i]
+            valid, _, pos = poses[i]
             if valid is True:
-                position = (np.zeros(3) - pos) @ rot #origin 0, 0, 0
-                position[1] *= -1 #Flipped y Unity to OpenCV #TODO move to trackers, each sensor should follow OpenCV
-                perSensorPosition[tid] = position
+                perSensorPosition[tid] = pos
         if all(pos is not None for pos in perSensorPosition):
             for i, position in enumerate(perSensorPosition):
                 allPositions[i].append(position)
