@@ -27,6 +27,11 @@ def worldToPixel(points, wh=2.048, dpm=1000, flipY=False):
         points[:, 1] = wh - points[:, 1]
     return points[:, 0:2] * dpm
     
+def rotToQuat(rot):
+    r = Rotation.from_matrix(rot)
+    quat = r.as_quat()
+    return quat
+    
 def rotToEuler(rot, degrees=True) :
     r = Rotation.from_matrix(rot)
     euler = r.as_euler("zxy", degrees)

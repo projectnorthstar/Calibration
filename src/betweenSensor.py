@@ -4,7 +4,7 @@ import time
 import cv2
 import sys
 import numpy as np
-from utils.transformHelpers import rotToEuler
+from utils.transformHelpers import rotToEuler, rotToQuat
 import argparse
 
 def kabsch(canonical_points, predicted_points):
@@ -179,8 +179,10 @@ if __name__ == "__main__":
                 print("From:", type(sensors[0]).__name__, "to:", type(sensors[i]).__name__)
                 print("Unity")
                 ru = rotToEuler(r) * (-1, 1, -1) #Flipped y OpenCV to Unity
+                rqu = rotToQuat(r) * (-1, 1, -1, 1) #Flipped y OpenCV to Unity
                 tu = t * (1, -1, 1) #Flipped y OpenCV to Unity
                 print("r: ", f"Vector3({','.join(str(x) for x in ru)})")
+                print("r: ", f"Quaternion({','.join(str(x) for x in rqu)})")
                 print("t: ", f"Vector3({','.join(str(x) for x in tu)})")
                 print("OpenCV")
                 print("r =", np.array2string(r, separator=','))
