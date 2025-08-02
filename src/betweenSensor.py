@@ -66,10 +66,10 @@ if __name__ == "__main__":
             },
             "undistortCorners": True
         },
-        "ELP": {
+        "Cv2Camera": {
             "cls": Cv2Camera,
             "kwargs": {
-                "index": 1,
+                "index": 0,
                 "exposure": -3
             }
         }

@@ -318,14 +318,14 @@ class CalibrationWidget(QWidget):
                     "value": 10000
                 }
             },
-            "ELP": {
+            "Cv2Camera": {
                 "cls": Cv2Camera,
                 "kwargs": {
-                    "index": 1
+                    "index": 0
                 },
                 "exposure": {
                     "minimum": -8,
-                    "maximum": -2,
+                    "maximum": 0,
                     "singleStep": 1,
                     "value": -5
                 }
