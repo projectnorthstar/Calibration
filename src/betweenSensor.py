@@ -70,7 +70,7 @@ if __name__ == "__main__":
             "cls": Cv2Camera,
             "kwargs": {
                 "index": 0,
-                "exposure": -3
+                "exposure": 0
             }
         }
     }
