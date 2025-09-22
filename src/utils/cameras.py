@@ -214,10 +214,18 @@ class Cv2CameraThread(CameraThread):
         for key in self.calibration:
             if isinstance(self.calibration[key], list):
                 self.calibration[key] = np.array(self.calibration[key])
+
+        # 180° rotation about Z-axis
+        R_fix = np.array([
+            [-1.0,  0.0,  0.0],
+            [ 0.0, -1.0,  0.0],
+            [ 0.0,  0.0,  1.0]
+        ], dtype=np.float64)
+
         for i, side in enumerate(self.sides):
             cm = self.calibration[side + "CameraMatrix"]
             dc = self.calibration[side + "DistCoeffs"]
-            self.calibration[side + "Map"] = ufunc(cm, dc, self.calibration[f"R{i + 1}"], cm, (self.calibration["imageWidth"], self.calibration["imageHeight"]), cv2.CV_32FC1)
+            self.calibration[side + "Map"] = ufunc(cm, dc, R_fix @ self.calibration[f"R{i + 1}"], cm, (self.calibration["imageWidth"], self.calibration["imageHeight"]), cv2.CV_32FC1)
 
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.calibration["imageWidth"] << 1)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.calibration["imageHeight"])
