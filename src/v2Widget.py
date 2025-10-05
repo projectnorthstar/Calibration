@@ -475,14 +475,14 @@ class CalibrationWidget(QWidget):
         import cv2
         img = cv2.imread(r"imgs\charuco.png", cv2.IMREAD_GRAYSCALE)
         #remap from checker to region captured by left / right camera
-        ry, rx = np.indices(targetResolution[::-1]).astype(np.float32)
+        ry, rx = np.indices(targetResolution[::-1])
         scaleX = abs(pixelRect[2, 0] - pixelRect[1, 0]) / targetWidth
         scaleY = abs(pixelRect[0, 1] - pixelRect[1, 1]) / targetHeight
         rx = rx * scaleX + pixelRect[1, 0]
-        ry = ry * scaleY + pixelRect[1, 1]
+        ry = (ry * scaleY + pixelRect[1, 1]).astype(np.float32)
         cameraOffset = self.selectedCamera.baseline * 500 #half baseline in mm
-        imgl = cv2.remap(img, rx - cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
-        imgr = cv2.remap(img, rx + cameraOffset, ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
+        imgl = cv2.remap(img, (rx - cameraOffset).astype(np.float32), ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
+        imgr = cv2.remap(img, (rx + cameraOffset).astype(np.float32), ry, cv2.INTER_LINEAR, cv2.BORDER_CONSTANT)
         
         lrx = self.lut.lut[0, :, :, 2]
         lry = 1 - self.lut.lut[0, :, :, 1] #flip y bcs opencv...

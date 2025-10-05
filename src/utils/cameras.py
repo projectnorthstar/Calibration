@@ -229,6 +229,8 @@ class Cv2CameraThread(CameraThread):
 
         self._cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.calibration["imageWidth"] << 1)
         self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.calibration["imageHeight"])
+        if "fps" in self.calibration:
+            self._cap.set(cv2.CAP_PROP_FPS, self.calibration["fps"])
         self._cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, self._autoExposure)
         self.exposure = self._exposure
         return
